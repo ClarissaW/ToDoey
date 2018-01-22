@@ -7,7 +7,7 @@
 //
 
 import Foundation
-class Item{
+class Item : Codable{//Encodable,Decodable
     var title: String = ""
-    var done : Bool = false
+    var done : Bool = false // the properties have to be standard data type
 }
