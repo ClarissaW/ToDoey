@@ -7,28 +7,19 @@
 //
 
 import UIKit
-
+import CoreData
 class TodoListViewController: UITableViewController {
 
-    //var itemArray = ["Find Mike", "Buy Eggs", "Destory Demogorgon"]
-    //let defaults = UserDefaults.standard
     var itemArray = [Item]()
-    let dataFilePath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first?.appendingPathComponent("Item.plist")
-    
+    //let dataFilePath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first?.appendingPathComponent("Item.plist")
+    let context = (UIApplication.shared.delegate as! AppDelegate).persistentContainer.viewContext
+
     //print(dataFilePath)
     
     override func viewDidLoad() {
         super.viewDidLoad()
-        //if let items = defaults.array(forKey: "ToDoListArray") as? [Item]{
-        //itemArray = items
-        //}
-        let newItem = Item()
-        newItem.title = "Find Mike"
-        itemArray.append(newItem)
-        
         loadItems()//decode the data stored in the plist
-        
-        
+        print(FileManager.default.urls(for: .documentDirectory, in: .userDomainMask))
     }
     
     // MARK - TableView DataSource Methods
@@ -64,15 +55,22 @@ class TodoListViewController: UITableViewController {
 //        }else{
 //            itemArray[indexPath.row].done = false
 //        }
-        itemArray[indexPath.row].done = !itemArray[indexPath.row].done
-        saveItems()
+
 //        if tableView.cellForRow(at: indexPath)?.accessoryType == .checkmark {
 //            tableView.cellForRow(at: indexPath)?.accessoryType = .none
 //        }
 //        else{
 //            tableView.cellForRow(at: indexPath)?.accessoryType = .checkmark
 //        }
-        tableView.reloadData()
+        itemArray[indexPath.row].done = !itemArray[indexPath.row].done
+        
+        //Mark : remove from CoreData
+//        context.delete(itemArray[indexPath.row])
+//        // remove data from permanent storage
+//        itemArray.remove(at: indexPath.row)
+//        // this only changes the UI, does nothing to the Coredata
+//
+        saveItems()
         tableView.deselectRow(at: indexPath, animated: true) 
         
     }
@@ -81,13 +79,15 @@ class TodoListViewController: UITableViewController {
         var textField = UITextField()
         let alert = UIAlertController(title: "Add new ToDoey item", message: "", preferredStyle: .alert)
         let action = UIAlertAction(title: "Add item", style: .default) { (action) in
-            let newItem = Item()
+            //let context = (UIApplication.shared.delegate as! AppDelegate).persistentContainer.viewContext
+            let newItem = Item(context: self.context)
             newItem.title = textField.text!
+            newItem.done = false
             self.itemArray.append(newItem)
             self.saveItems()
            // self.defaults.set(self.itemArray, forKey: "ToDoListArray")
             
-            self.tableView.reloadData()
+            
 //            //self.itemArray.append(textField.text ?? "New Item") // if the user did not input text in this field, it will automatically add "New Item" in the tableview
             
         }
@@ -101,26 +101,42 @@ class TodoListViewController: UITableViewController {
         
     }
     func saveItems(){
-        let encoder = PropertyListEncoder()
         do{
-            let data = try encoder.encode(itemArray)
-            try data.write(to: dataFilePath!)
+            try context.save()
         } catch{
             print(error)
         }
-    }
-    func loadItems(){
-        if let data = try? Data(contentsOf: dataFilePath!){
-            let decoder = PropertyListDecoder()
-            do{
-           // try decoder.decode(<#T##type: Decodable.Protocol##Decodable.Protocol#>, from: <#T##Data#>)
-            //type is [Item], not refering the object
-                itemArray = try decoder.decode([Item].self, from: data)
-            }catch{
-                print(error)
-            }
-        }
+        self.tableView.reloadData()
     }
     
+    
+    func loadItems(with request:NSFetchRequest<Item> = Item.fetchRequest()){ // if request is null, then set it to the default value, witch is item.fetchrequest()
+        do{
+            itemArray = try context.fetch(request)
+        }catch{
+            print(error)
+        }
+        tableView.reloadData()
+    }
+}
+// MARK : extension, searchbar methods
+extension TodoListViewController : UISearchBarDelegate{
+    func searchBarSearchButtonClicked(_ searchBar: UISearchBar) {
+        let request:NSFetchRequest<Item> = Item.fetchRequest()
+        request.predicate = NSPredicate(format: "title CONTAINS[cd] %@", searchBar.text!) // specifies how we want to query data, c means case, d means diacritic
+//        let sortDescriptor = NSSortDescriptor(key: "title", ascending: true)
+//        request.sortDescriptors = [sortDescriptor]
+        request.sortDescriptors = [NSSortDescriptor(key: "title", ascending: true)]
+        loadItems(with: request)
+    }
+    func searchBar(_ searchBar: UISearchBar, textDidChange searchText: String) {
+        if searchBar.text?.count == 0 {
+            loadItems()
+            DispatchQueue.main.async {
+                searchBar.resignFirstResponder()
+            }
+            
+        }
+    }
 }
 
