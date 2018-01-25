@@ -8,9 +8,13 @@
 
 import UIKit
 import RealmSwift
+import ChameleonFramework
+
 class TodoListViewController: SwipeTableViewController {
     let realm = try! Realm()
     var todoItems : Results<Item>?
+    
+    @IBOutlet weak var searchBar: UISearchBar!
     var selectedCategory: Category?{
         didSet{
           loadItems() // when selectedCategory gets set a value
@@ -19,11 +23,46 @@ class TodoListViewController: SwipeTableViewController {
     
     override func viewDidLoad() {
         super.viewDidLoad()
+        tableView.separatorStyle = .none
         
+        // Navigation controller bar could not be stacked with ToDoList Controller
         //print(FileManager.default.urls(for: .documentDirectory, in: .userDomainMask))
     }
     
-    // MARK - TableView DataSource Methods
+    override func viewWillAppear(_ animated: Bool) { //will be called later after viewdidload and before users see on the screen
+        title = selectedCategory?.name // this is not within if let, for safer, use ? to replace !
+        guard let color = selectedCategory?.color else { fatalError()}
+        updateNavBar(withHexCode: color)
+        
+            //because if navigationcontroller is nil, this code will not work : so use if let to replace this code navigationController?.navigationBar.barTintColor = UIColor(hexString:color)
+       
+             // NEXT STEP: change if let to guard let.
+        
+    }
+    
+    // MARK: - View will disapper
+    
+    override func viewWillDisappear(_ animated: Bool) {
+//        guard let originalColor = UIColor(hexString: "1D9BF6") else{fatalError()}
+//        navigationController?.navigationBar.barTintColor = originalColor
+//        navigationController?.navigationBar.tintColor = FlatWhite()
+//        navigationController?.navigationBar.largeTitleTextAttributes = [NSAttributedStringKey.foregroundColor: FlatWhite()]
+        updateNavBar(withHexCode: "1D9BF6")
+    }
+    
+    // MARK: - Nav Bar Setup Methods
+    func updateNavBar(withHexCode colorHexCode: String){
+        guard let navBar = navigationController?.navigationBar else {fatalError("Navigation controller does not exist")}
+        guard let navBarColor = UIColor(hexString:colorHexCode) else { fatalError() }
+        
+        navBar.barTintColor = navBarColor
+        navBar.tintColor = ContrastColorOf(navBarColor, returnFlat: true)
+        navBar.largeTitleTextAttributes = [NSAttributedStringKey.foregroundColor : ContrastColorOf(navBarColor, returnFlat: true)]
+        searchBar.barTintColor = UIColor(hexString:colorHexCode)
+    }
+    
+    
+    // MARK: - TableView DataSource Methods
     override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
         return todoItems?.count ?? 1
     }
@@ -34,6 +73,11 @@ class TodoListViewController: SwipeTableViewController {
         let cell = super.tableView(tableView, cellForRowAt: indexPath)
         if let item = todoItems?[indexPath.row]{
             cell.textLabel?.text = item.title
+            if let color = UIColor(hexString: selectedCategory!.color)?.darken(byPercentage: CGFloat(indexPath.row) / CGFloat(todoItems!.count)){ // if the color is nil, trying to darken it will be crashed: optinal chaining
+                cell.backgroundColor = color
+                cell.textLabel?.textColor = ContrastColorOf(color, returnFlat: true)
+            
+            }
             cell.accessoryType = item.done == true ? .checkmark : .none
         }else{
             cell.textLabel?.text = "No item added"
